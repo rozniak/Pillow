@@ -67,6 +67,9 @@ class BmpImageFile(ImageFile.ImageFile):
     format_description = "Windows Bitmap"
     format = "BMP"
 
+    # -------------------------------------------------  Explicit Alpha Formats
+    hint_formats = ["DIBA", "RGBA"]
+
     # -------------------------------------------------- BMP Compression values
     COMPRESSIONS = {"RAW": 0, "RLE8": 1, "RLE4": 2, "BITFIELDS": 3, "JPEG": 4, "PNG": 5}
     for k, v in COMPRESSIONS.items():
@@ -242,7 +245,10 @@ class BmpImageFile(ImageFile.ImageFile):
                 msg = "Unsupported BMP bitfields layout"
                 raise OSError(msg)
         elif file_info["compression"] == self.COMPRESSIONS["RAW"]:
-            if file_info["bits"] == 32 and header == 22:  # 32-bit .cur offset
+            # ----------------------------- 32-bit .cur offset or explicit hint
+            if file_info["bits"] == 32 and (
+                header == 22 or self.format in self.hint_formats
+            ):
                 raw_mode, self._mode = "BGRA", "RGBA"
         elif file_info["compression"] in (
             self.COMPRESSIONS["RLE8"],
@@ -402,6 +408,25 @@ class DibImageFile(BmpImageFile):
         self._bitmap()
 
 
+# =============================================================================
+# Image plugins for hinting alpha support (for 32bpp BMPs)
+# =============================================================================
+class BmpAlphaImageFile(BmpImageFile):
+    format = "BMPA"
+    format_description = "Windows Bitmap"
+
+    def _open(self) -> None:
+        super()._open()
+
+
+class DibAlphaImageFile(DibImageFile):
+    format = "DIBA"
+    format_description = "Windows Bitmap"
+
+    def _open(self) -> None:
+        super()._open()
+
+
 #
 # --------------------------------------------------------------------
 # Write BMP file
@@ -509,3 +534,8 @@ Image.register_save(DibImageFile.format, _dib_save)
 Image.register_extension(DibImageFile.format, ".dib")
 
 Image.register_mime(DibImageFile.format, "image/bmp")
+
+Image.register_open(BmpAlphaImageFile.format, BmpAlphaImageFile, _accept)
+Image.register_save(BmpAlphaImageFile.format, _save)
+Image.register_open(DibAlphaImageFile.format, DibAlphaImageFile, _dib_accept)
+Image.register_save(DibAlphaImageFile.format, _dib_save)
